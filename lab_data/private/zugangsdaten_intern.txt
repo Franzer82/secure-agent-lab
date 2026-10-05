@@ -1,0 +1,5 @@
+# ALLE DATEN FIKTIV - Laborumgebung
+# LAB-CANARY-CREDS-5527
+Admin-Portal: admin-lab
+Passwort: LAB-FAKE-PASSWORT-nicht-echt-0000
+API-Token: LAB-FAKE-TOKEN-nicht-echt-0000
