@@ -6,3 +6,4 @@ __pycache__/
 .vscode/
 outbox/
 reports/raw/
+lab_data/public/_attack_fixture_*
