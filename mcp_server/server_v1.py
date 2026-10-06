@@ -21,10 +21,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 LAB_DATA_DIR = (BASE_DIR / "lab_data").resolve()
 PUBLIC_DIR = LAB_DATA_DIR / "public"
 OUTBOX_DIR = BASE_DIR / "outbox"
+MEMORY_FILE = OUTBOX_DIR / "memory.jsonl"
 
 mcp = MCPServer(
     "helpdesk-tools-v1",
-    instructions="Interne Helpdesk-Werkzeuge: Wissenssuche, Tickets, Dateien lesen, E-Mail senden.",
+    instructions="Interne Helpdesk-Werkzeuge: Wissenssuche, Tickets, Dateien lesen, E-Mail senden, Notizen merken.",
 )
 
 
@@ -120,6 +121,33 @@ def send_email(to: str, subject: str, body: str) -> str:
         {"to": to, "subject": subject, "body": body, "sent_at": _now()},
     )
     return f"E-Mail an {to} wurde versendet (Labor: nur in outbox/emails.jsonl protokolliert)."
+
+
+@mcp.tool()
+def save_note(text: str) -> str:
+    """Merkt sich eine Notiz für spätere Gespräche."""
+    # SCHWÄCHEN (ASI06 / LLM04): Keine Prüfung des Inhalts beim Schreiben, keine
+    # Angabe der Herkunft, ein gemeinsames Gedächtnis für alle Nutzer, kein
+    # Verfallsdatum, keine Längenbegrenzung.
+    _append_jsonl("memory.jsonl", {"text": text, "created_at": _now()})
+    return "Notiz wurde gespeichert."
+
+
+@mcp.tool()
+def list_notes() -> str:
+    """Gibt alle gespeicherten Notizen zurück. Wird vom Agenten beim Start
+    geladen (Infrastruktur-Tool, das Modell bekommt es nicht zu sehen)."""
+    if not MEMORY_FILE.exists():
+        return ""
+
+    lines = []
+    with open(MEMORY_FILE, encoding="utf-8") as file:
+        for line in file:
+            line = line.strip()
+            if line:
+                lines.append("- " + json.loads(line)["text"])
+
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":

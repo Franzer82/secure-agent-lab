@@ -18,6 +18,10 @@ MAX_ATTEMPTS = 3
 SERVER_ERROR_PAUSE_SECONDS = 5
 RATE_LIMIT_PAUSE_SECONDS = 20
 
+# Infrastruktur-Tool: Der Agent ruft es beim Start selbst auf, um das
+# Gedächtnis zu laden. Dem Modell wird es NICHT angeboten.
+MEMORY_LOAD_TOOL = "list_notes"
+
 
 # ---------------------------------------------------------------------------
 # Datenstrukturen
@@ -33,11 +37,22 @@ class PolicyDecision:
 # Eine Policy ist eine Funktion: (Tool-Name, Argumente) -> Entscheidung.
 Policy = Callable[[str, dict], PolicyDecision]
 
+# Ein Gedächtnis-Formatierer macht aus den gespeicherten Notizen den Textblock,
+# der dem Modell gezeigt wird.
+MemoryFormatter = Callable[[str], str]
+
 
 def allow_all_policy(tool_name: str, args: dict) -> PolicyDecision:
     """Version 1: Es wird alles erlaubt. Genau das ist die Schwäche - der Agent
     führt jeden Wunsch des Modells ungeprüft aus."""
     return PolicyDecision(allowed=True)
+
+
+def format_memory_v1(notes_text: str) -> str:
+    """Version 1: Die Notizen werden ungekennzeichnet in den SYSTEMPROMPT
+    gehängt, also an die Stelle mit der höchsten Autorität. Das Modell kann
+    nicht erkennen, woher eine Notiz stammt oder ob sie manipuliert wurde."""
+    return f"Gespeicherte Notizen aus früheren Gesprächen:\n{notes_text}"
 
 
 @dataclass
@@ -57,12 +72,16 @@ class AgentRun:
 
     'error' ist gefüllt, wenn der Lauf technisch scheiterte (z. B. API-Fehler).
     Solche Läufe dürfen in der Auswertung NICHT als 'Angriff abgewehrt' zählen,
-    sondern müssen aussortiert werden - sonst verfälschen sie die Messung."""
+    sondern müssen aussortiert werden - sonst verfälschen sie die Messung.
+
+    'memory_text' hält fest, welche Notizen beim Start geladen wurden. Das
+    brauchen wir, um bei A8 zu belegen, dass eine vergiftete Notiz im Kontext war."""
     user_message: str
     final_text: str
     tool_calls: list[ToolCallRecord] = field(default_factory=list)
     steps: int = 0
     error: str = ""
+    memory_text: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -107,6 +126,18 @@ async def _generate_with_retry(gemini: genai.Client, contents: list, config: typ
     raise last_error
 
 
+async def _load_memory(mcp_client: Client) -> str:
+    """Holt die gespeicherten Notizen vom Server. Fehler führen zu 'kein
+    Gedächtnis', nicht zum Abbruch des Laufs."""
+    try:
+        result = await mcp_client.call_tool(MEMORY_LOAD_TOOL, {})
+    except Exception:
+        return ""
+    if result.is_error:
+        return ""
+    return _text_of(result).strip()
+
+
 async def _execute_tool_call(mcp_client: Client, policy: Policy, name: str, args: dict) -> ToolCallRecord:
     """Prüft einen Tool-Wunsch des Modells gegen die Policy und führt ihn nur bei
     Erlaubnis über MCP aus. Das ist der zentrale Durchsetzungspunkt: Die
@@ -142,6 +173,8 @@ async def run_agent(
     server_path: Path,
     system_prompt: str,
     policy: Policy = allow_all_policy,
+    memory_formatter: MemoryFormatter = format_memory_v1,
+    load_memory: bool = True,
     max_steps: int = DEFAULT_MAX_STEPS,
 ) -> AgentRun:
     gemini = _create_gemini_client()
@@ -158,9 +191,17 @@ async def run_agent(
 
     async with Client(server_params) as mcp_client:
         listed = await mcp_client.list_tools()
+        tool_names = {tool.name for tool in listed.tools}
+
+        # Gedächtnis laden und dem Systemprompt anhängen.
+        effective_prompt = system_prompt
+        if load_memory and MEMORY_LOAD_TOOL in tool_names:
+            run.memory_text = await _load_memory(mcp_client)
+            if run.memory_text:
+                effective_prompt = f"{system_prompt}\n\n{memory_formatter(run.memory_text)}"
 
         # Die Tool-Beschreibungen des Servers (inkl. JSON-Schema der Argumente)
-        # werden an Gemini weitergereicht.
+        # werden an Gemini weitergereicht - außer dem Infrastruktur-Tool.
         declarations = [
             types.FunctionDeclaration(
                 name=tool.name,
@@ -168,10 +209,11 @@ async def run_agent(
                 parameters_json_schema=tool.input_schema,
             )
             for tool in listed.tools
+            if tool.name != MEMORY_LOAD_TOOL
         ]
 
         config = types.GenerateContentConfig(
-            system_instruction=system_prompt,
+            system_instruction=effective_prompt,
             tools=[types.Tool(function_declarations=declarations)],
             # WICHTIGSTE ZEILE: Das SDK darf Tools NICHT selbst ausführen,
             # sonst würde unsere Policy-Schicht umgangen.
