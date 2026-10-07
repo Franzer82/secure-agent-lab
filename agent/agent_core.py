@@ -1,22 +1,23 @@
 import os
 import sys
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import anyio
-from dotenv import load_dotenv
 from google import genai
 from google.genai import errors, types
 from mcp import Client, StdioServerParameters
 from mcp.types import TextContent
 
-GEMINI_MODEL = "gemini-3.8-flash"
+from lab_settings import GEMINI_MODEL, MIN_REQUEST_INTERVAL_SECONDS
+from usage_budget import DailyBudgetExhausted, record_request
 
 DEFAULT_MAX_STEPS = 6
 MAX_ATTEMPTS = 3
 SERVER_ERROR_PAUSE_SECONDS = 5
-RATE_LIMIT_PAUSE_SECONDS = 20
+RATE_LIMIT_PAUSE_SECONDS = 30
 
 # Infrastruktur-Tool: Der Agent ruft es beim Start selbst auf, um das
 # Gedächtnis zu laden. Dem Modell wird es NICHT angeboten.
@@ -93,20 +94,39 @@ def _text_of(result) -> str:
 
 
 def _create_gemini_client() -> genai.Client:
-    load_dotenv()
+    # Die .env wurde beim Import von lab_settings bereits geladen.
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY nicht gefunden (.env prüfen)")
     return genai.Client(api_key=api_key)
 
 
+# Zeitpunkt der letzten Anfrage. Gilt für den ganzen Prozess, also auch über
+# mehrere Agenten-Läufe hinweg (z. B. in der Angriffs-Suite).
+_last_request_at = -1e9
+
+
+async def _throttle() -> None:
+    """Hält den Mindestabstand zwischen zwei Anfragen ein, damit das Minutenlimit
+    gar nicht erst erreicht wird. Besser vorbeugen als bei einem 429 raten."""
+    global _last_request_at
+    wait = MIN_REQUEST_INTERVAL_SECONDS - (time.monotonic() - _last_request_at)
+    if wait > 0:
+        await anyio.sleep(wait)
+    _last_request_at = time.monotonic()
+
+
 async def _generate_with_retry(gemini: genai.Client, contents: list, config: types.GenerateContentConfig):
-    """Ruft Gemini auf und wiederholt bei vorübergehenden Fehlern: Serverfehler
-    auf Googles Seite (5xx) und Anfragelimit (429). Alle anderen Fehler (z. B.
-    ungültiger Schlüssel) werden sofort weitergegeben, denn Warten hilft dort nicht."""
+    """Ruft Gemini auf: gedrosselt, gezählt und mit Wiederholung bei vorübergehenden
+    Fehlern (5xx auf Googles Seite, 429 Anfragelimit). Alle anderen Fehler
+    (z. B. ungültiger Schlüssel) werden sofort weitergegeben, denn Warten hilft
+    dort nicht. JEDE Anfrage wird gezählt, auch jede Wiederholung."""
     last_error = None
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
+        await _throttle()
+        record_request(GEMINI_MODEL)  # kann DailyBudgetExhausted auslösen
+
         try:
             return await gemini.aio.models.generate_content(
                 model=GEMINI_MODEL, contents=contents, config=config
@@ -225,11 +245,15 @@ async def run_agent(
         for step in range(1, max_steps + 1):
             run.steps = step
 
-            # API-Fehler hier abfangen und im Lauf vermerken, statt sie durch den
+            # Fehler hier abfangen und im Lauf vermerken, statt sie durch den
             # async-with-Block nach außen fliegen zu lassen (dort würden sie in
             # unleserliche Exception Groups verpackt).
             try:
                 response = await _generate_with_retry(gemini, contents, config)
+            except DailyBudgetExhausted:
+                run.error = "Tagesbudget an Anfragen erschöpft"
+                run.final_text = f"(Lauf abgebrochen: {run.error})"
+                return run
             except errors.APIError as error:
                 run.error = f"Gemini-Fehler (Code {getattr(error, 'code', '?')}, {getattr(error, 'status', '?')})"
                 run.final_text = f"(Lauf abgebrochen: {run.error})"
