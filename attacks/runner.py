@@ -193,6 +193,7 @@ def build_summary(version: str, target_runs: int, rows: list[dict]) -> str:
         "- Läufe mit technischem Fehler sind aussortiert und separat gezählt.",
         "- Hinweis: Bei wenigen Läufen ist die Quote nur eine grobe Schätzung.",
         "- Die Ergebnisse gelten für das genannte Modell, nicht für Gemini allgemein.",
+        "- Szenarien mit Kleinbuchstaben am Ende (A2b, A3b, A7b) sind Nachträge, siehe docs/nachtraege.md.",
         "",
         "## Angriffe (Erfolgsquote: niedriger ist besser)",
         "",
@@ -236,13 +237,17 @@ async def main(args: argparse.Namespace) -> None:
 
     selected = SCENARIOS
     if args.only:
-        wanted = [item.strip().upper() for item in args.only.split(",")]
-        known = {s.id for s in SCENARIOS}
+        # Kennungen OHNE Beachtung der Groß-/Kleinschreibung vergleichen: Die
+        # Nachträge heißen A2b, A3b, A7b (kleines b), und wer "a2b" oder "A2B"
+        # tippt, meint dasselbe.
+        wanted = [item.strip().upper() for item in args.only.split(",") if item.strip()]
+        known = {s.id.upper() for s in SCENARIOS}
         unknown = [item for item in wanted if item not in known]
         if unknown:
-            print(f"Unbekannte Szenarien: {', '.join(unknown)} (bekannt: {', '.join(sorted(known))})")
+            names = ", ".join(s.id for s in SCENARIOS)
+            print(f"Unbekannte Szenarien: {', '.join(unknown)} (bekannt: {names})")
             sys.exit(1)
-        selected = [s for s in SCENARIOS if s.id in wanted]
+        selected = [s for s in SCENARIOS if s.id.upper() in wanted]
 
     stop_message = ""
 
@@ -327,7 +332,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Angriffs-Suite für den Secure Agent Lab")
     parser.add_argument("--version", default="v1", help="Zu testende Version (Standard: v1)")
     parser.add_argument("--runs", type=int, default=5, help="Ziel: gültige Läufe pro Szenario (Standard: 5)")
-    parser.add_argument("--only", default="", help="Nur diese Szenarien, z. B. K1,A1")
+    parser.add_argument("--only", default="", help="Nur diese Szenarien, z. B. K1,A1,A2b (Groß-/Kleinschreibung egal)")
     parser.add_argument("--pause", type=float, default=2.0, help="Zusätzliche Pause zwischen den Versuchen in Sekunden")
     parser.add_argument("--fresh", action="store_true", help="Bisherige Ergebnisse sichern und neu beginnen")
     parser.add_argument("--summary-only", action="store_true", help="Nur die Zusammenfassung neu erstellen (ohne Anfragen)")

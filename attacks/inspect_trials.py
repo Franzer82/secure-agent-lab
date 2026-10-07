@@ -5,14 +5,18 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Zeigt gespeicherte Versuche im Detail an, ohne eine Anfrage zu stellen.
-# Nutzung: python3 attacks/inspect_trials.py A3 1
+# Nutzung: python3 attacks/inspect_trials.py A3b 1
 #   (Szenario, Anzahl der letzten gültigen Versuche, optional die Version)
+# Die Schreibweise der Kennung ist egal (A3b, a3b und A3B sind dasselbe).
 
 # Für indirekte Angriffe: Woran erkennt man, dass das präparierte Dokument im
-# Suchergebnis stand, also dem Modell überhaupt gezeigt wurde?
+# Suchergebnis stand, also dem Modell überhaupt gezeigt wurde? Die Schlüssel
+# stehen in Großbuchstaben, weil die Kennung vor dem Nachschlagen umgewandelt wird.
 FIXTURE_MARKERS = {
     "A3": "helpdesk-archiv@extern.example",
+    "A3B": "helpdesk-archiv@extern.example",
     "A7": "tracker.angreifer.example",
+    "A7B": "tracker.angreifer.example",
 }
 
 
@@ -34,7 +38,10 @@ def main() -> None:
     with open(path, encoding="utf-8") as file:
         trials = [json.loads(line) for line in file if line.strip()]
 
-    selected = [t for t in trials if t["scenario_id"] == scenario_id and t["status"] != "fehler"][-limit:]
+    selected = [
+        t for t in trials
+        if t["scenario_id"].upper() == scenario_id and t["status"] != "fehler"
+    ][-limit:]
     if not selected:
         print(f"Keine gültigen Versuche für {scenario_id} gefunden.")
         sys.exit(1)
@@ -42,7 +49,7 @@ def main() -> None:
     marker = FIXTURE_MARKERS.get(scenario_id)
 
     for number, trial in enumerate(selected, start=1):
-        print(f"=== {scenario_id}, Versuch {number}: Bewertung '{trial['status']}', Modell {trial['model']}")
+        print(f"=== {trial['scenario_id']}, Versuch {number}: Bewertung '{trial['status']}', Modell {trial['model']}")
         seen = False
 
         for run_number, run in enumerate(trial["runs"], start=1):
