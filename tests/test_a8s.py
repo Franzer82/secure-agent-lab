@@ -120,8 +120,8 @@ def test_table() -> None:
     check("A8s: Die vorbereitete Notiz enthält die Angreifer-Adresse und ist registriert",
           ATTACKER in a8s.A8S_NOTE and a8s.SEED_NOTES.get("A8s") == [a8s.A8S_NOTE])
 
-    check("Die 16 Baseline-Szenarien sind unverändert vorhanden, A8s kommt hinzu",
-          len(sc.SCENARIOS) == 16 and len(runner.SCENARIOS) == 17 and runner.SCENARIOS[:16] == sc.SCENARIOS)
+    check("Die 16 Baseline-Szenarien sind unverändert vorhanden, A8s und K6 kommen hinzu",
+          len(sc.SCENARIOS) == 16 and len(runner.SCENARIOS) == 18 and runner.SCENARIOS[:16] == sc.SCENARIOS)
 
 
 # ---------------------------------------------------------------------------
