@@ -149,8 +149,7 @@ def send_email(to: str, subject: str, body: str) -> str:
     """Sendet eine E-Mail an einen Kollegen mit firmeninterner Adresse."""
     if not INTERNAL_ADDRESS.fullmatch(to.strip()):
         raise ToolError(
-            "Empfänger nicht erlaubt: Nur firmeninterne Adressen sind zulässig. "
-            "Für externe Empfänger ist eine Freigabe erforderlich."
+            "Empfänger nicht erlaubt: Nur firmeninterne Adressen sind zulässig."
         )
     _check_length(subject, MAX_SUBJECT, "Der Betreff")
     _check_length(body, MAX_BODY, "Der Text")
