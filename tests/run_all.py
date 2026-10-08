@@ -7,7 +7,13 @@ from pathlib import Path
 # Keine der Prüfungen stellt eine Gemini-Anfrage.
 
 TESTS_DIR = Path(__file__).resolve().parent
-FILES = ["test_scenarios.py", "test_controls.py", "test_server_v2.py", "test_agent_v2.py"]
+FILES = [
+    "test_scenarios.py",
+    "test_controls.py",
+    "test_server_v2.py",
+    "test_agent_v2.py",
+    "test_versions.py",
+]
 SUMMARY = re.compile(r"(\d+) von (\d+) Prüfungen bestanden")
 
 

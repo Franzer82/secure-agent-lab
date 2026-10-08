@@ -30,7 +30,7 @@ MAX_CONSECUTIVE_ERRORS = 3
 # dauerhaften Fehler.
 MAX_ATTEMPT_FACTOR = 2
 
-# Obergrenze der Anfragen, die ein einzelner Versuch brauchen kann (A8: zwei
+# Obergrenze der Anfragen, die ein einzelner Versuch brauchen kann (zwei
 # Agenten-Läufe mit je bis zu 6 Schritten, plus Reserve). Wir starten nur dann
 # einen Versuch, wenn das Tagesbudget dafür reicht - so wird das Limit nie
 # mitten in einem Versuch überrannt.
@@ -40,7 +40,8 @@ MIN_REQUESTS_PER_TRIAL = 14
 @dataclass
 class Trial:
     """Ein einzelner Versuch. Status: 'ja' (Kriterium erfüllt), 'nein' oder 'fehler'
-    (technisches Problem, wird aus der Auswertung herausgenommen)."""
+    (technisches Problem, wird aus der Auswertung herausgenommen). Die gespeicherten
+    Läufe enthalten alle Tool-Aufrufe und die Antwort VOR und NACH dem Ausgabefilter."""
     scenario_id: str
     status: str
     detail: str
@@ -116,13 +117,9 @@ async def run_trial(scenario: Scenario, config: VersionConfig) -> Trial:
 
     try:
         for message in scenario.messages:
-            run = await run_agent(
-                message,
-                server_path=config.server_path,
-                system_prompt=config.system_prompt,
-                policy=config.policy,
-                memory_formatter=config.memory_formatter,
-            )
+            # agent_kwargs() erzeugt für JEDES Gespräch eine neue Policy. Szenarien
+            # mit zwei Nachrichten (A8, K5) sind zwei getrennte Gespräche.
+            run = await run_agent(message, **config.agent_kwargs())
             runs.append(run)
             if run.error:
                 break
@@ -180,7 +177,7 @@ def percent(rate) -> str:
     return "n/a" if rate is None else f"{rate:.0%}"
 
 
-def build_summary(version: str, target_runs: int, rows: list[dict]) -> str:
+def build_summary(version: str, target_runs: int, rows: list[dict], excluded: dict[str, str]) -> str:
     attacks = [r for r in rows if r["kind"] == "attack"]
     controls = [r for r in rows if r["kind"] == "control"]
 
@@ -201,6 +198,12 @@ def build_summary(version: str, target_runs: int, rows: list[dict]) -> str:
         "|---|---|---|---|---|---|---|---|---|",
     ]
     for r in attacks:
+        if r["id"] in excluded:
+            lines.append(
+                f"| {r['id']} | {r['title']} | {r['route']} | {r['owasp']} | - | - | "
+                f"nicht gemessen | - | {excluded[r['id']]} |"
+            )
+            continue
         lines.append(
             f"| {r['id']} | {r['title']} | {r['route']} | {r['owasp']} | {r['valid']} | "
             f"{r['wins']} | {percent(r['rate'])} | {r['errors']} | {r['stage_text'] or '-'} |"
@@ -210,13 +213,13 @@ def build_summary(version: str, target_runs: int, rows: list[dict]) -> str:
         "",
         "## Kontrollfälle (Funktionserhalt: höher ist besser)",
         "",
-        "| ID | Aufgabe | Gültige Läufe | Bestanden | Quote | Technische Fehler |",
-        "|---|---|---|---|---|---|",
+        "| ID | Aufgabe | Gültige Läufe | Bestanden | Quote | Technische Fehler | Stufen |",
+        "|---|---|---|---|---|---|---|",
     ]
     for r in controls:
         lines.append(
             f"| {r['id']} | {r['title']} | {r['valid']} | {r['wins']} | "
-            f"{percent(r['rate'])} | {r['errors']} |"
+            f"{percent(r['rate'])} | {r['errors']} | {r['stage_text'] or '-'} |"
         )
 
     return "\n".join(lines) + "\n"
@@ -248,6 +251,15 @@ async def main(args: argparse.Namespace) -> None:
             print(f"Unbekannte Szenarien: {', '.join(unknown)} (bekannt: {names})")
             sys.exit(1)
         selected = [s for s in SCENARIOS if s.id.upper() in wanted]
+
+    # Szenarien, die für diese Version bewusst nicht gemessen werden (Begründung
+    # steht in der Versionsbeschreibung und im Messplan), werden übersprungen.
+    skipped = [s for s in selected if s.id in config.excluded]
+    for scenario in skipped:
+        print(f"{scenario.id}: nicht gemessen ({config.excluded[scenario.id]})")
+    if skipped:
+        print()
+    selected = [s for s in selected if s.id not in config.excluded]
 
     stop_message = ""
 
@@ -314,7 +326,7 @@ async def main(args: argparse.Namespace) -> None:
 
     REPORTS_DIR.mkdir(exist_ok=True)
     summary_path = REPORTS_DIR / f"summary_{config.name}.md"
-    summary_path.write_text(build_summary(config.name, args.runs, rows), encoding="utf-8")
+    summary_path.write_text(build_summary(config.name, args.runs, rows, config.excluded), encoding="utf-8")
     print(f"\nZusammenfassung: {summary_path.relative_to(BASE_DIR)}")
     print(f"Alle Versuche:   {path.relative_to(BASE_DIR)}")
     print(f"Tagesbudget:     noch {remaining_today(GEMINI_MODEL)} von {DAILY_BUDGET} Anfragen")
