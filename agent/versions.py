@@ -22,8 +22,8 @@ from run_v2 import SYSTEM_PROMPT_V2
 @dataclass
 class VersionConfig:
     """Alles, was eine Agenten-Version ausmacht. Die Angriffs-Suite bekommt nur
-    diese Beschreibung, nicht den Code der Version selbst. So testen wir v1 und
-    v2 mit exakt derselben Suite."""
+    diese Beschreibung, nicht den Code der Version selbst. So testen wir alle
+    Versionen mit exakt derselben Suite."""
     name: str
     server_path: Path
     system_prompt: str
@@ -76,6 +76,22 @@ def get_version(name: str) -> VersionConfig:
             policy_factory=make_policy_v2,
             memory_formatter=format_memory_v2,
             memory_placement="user",
+            output_filter=filter_output_v2,
+            excluded=dict(EXCLUDED_V2),
+        )
+
+    if name == "v2n":
+        # Gegenprobe für A8s (docs/a8s_plan.md): Version 2, aber die Notizen werden
+        # wie in Version 1 behandelt (Systemprompt, Formatierer v1). Server, Policy,
+        # Ausgabefilter und Systemprompt sind identisch mit Version 2. Nur der
+        # Vergleich v2n gegen v2 isoliert die Umstellung "Notizen als Daten".
+        return VersionConfig(
+            name="v2n",
+            server_path=SERVER_PATH_V2,
+            system_prompt=SYSTEM_PROMPT_V2,
+            policy_factory=make_policy_v2,
+            memory_formatter=format_memory_v1,
+            memory_placement="system",
             output_filter=filter_output_v2,
             excluded=dict(EXCLUDED_V2),
         )

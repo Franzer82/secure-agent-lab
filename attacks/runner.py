@@ -14,9 +14,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from agent_core import GEMINI_MODEL, run_agent  # noqa: E402
 from lab_settings import DAILY_BUDGET  # noqa: E402
 from lab_state import reset_all  # noqa: E402
-from scenarios import SCENARIOS, Scenario, cleanup_fixtures, install_fixture  # noqa: E402
+from scenarios import SCENARIOS as BASE_SCENARIOS  # noqa: E402
+from scenarios import Scenario, cleanup_fixtures, install_fixture  # noqa: E402
+from scenarios_a8s import A8S_SCENARIOS, install_seed  # noqa: E402
 from usage_budget import remaining_today  # noqa: E402
 from versions import VersionConfig, get_version  # noqa: E402
+
+# Alle Szenarien: die der Baseline (scenarios.py, unverändert) plus der Nachtrag
+# A8s (scenarios_a8s.py, siehe docs/a8s_plan.md).
+SCENARIOS = BASE_SCENARIOS + A8S_SCENARIOS
 
 REPORTS_DIR = BASE_DIR / "reports"
 RAW_DIR = REPORTS_DIR / "raw"
@@ -111,6 +117,7 @@ async def run_trial(scenario: Scenario, config: VersionConfig) -> Trial:
     reset_all()
     cleanup_fixtures()
     install_fixture(scenario)
+    install_seed(scenario)  # vorbereitete Notizen (nur A8s), NACH dem Zurücksetzen
 
     timestamp = datetime.now().isoformat(timespec="seconds")
     runs = []
@@ -190,7 +197,8 @@ def build_summary(version: str, target_runs: int, rows: list[dict], excluded: di
         "- Läufe mit technischem Fehler sind aussortiert und separat gezählt.",
         "- Hinweis: Bei wenigen Läufen ist die Quote nur eine grobe Schätzung.",
         "- Die Ergebnisse gelten für das genannte Modell, nicht für Gemini allgemein.",
-        "- Szenarien mit Kleinbuchstaben am Ende (A2b, A3b, A7b) sind Nachträge, siehe docs/nachtraege.md.",
+        "- Szenarien mit Kleinbuchstaben am Ende (A2b, A3b, A7b, A8s) sind Nachträge, siehe "
+        "docs/nachtraege.md und docs/a8s_plan.md.",
         "",
         "## Angriffe (Erfolgsquote: niedriger ist besser)",
         "",
@@ -241,8 +249,8 @@ async def main(args: argparse.Namespace) -> None:
     selected = SCENARIOS
     if args.only:
         # Kennungen OHNE Beachtung der Groß-/Kleinschreibung vergleichen: Die
-        # Nachträge heißen A2b, A3b, A7b (kleines b), und wer "a2b" oder "A2B"
-        # tippt, meint dasselbe.
+        # Nachträge heißen A2b, A3b, A7b, A8s (kleiner Buchstabe am Ende), und wer
+        # "a2b" oder "A2B" tippt, meint dasselbe.
         wanted = [item.strip().upper() for item in args.only.split(",") if item.strip()]
         known = {s.id.upper() for s in SCENARIOS}
         unknown = [item for item in wanted if item not in known]
@@ -342,9 +350,9 @@ async def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Angriffs-Suite für den Secure Agent Lab")
-    parser.add_argument("--version", default="v1", help="Zu testende Version (Standard: v1)")
+    parser.add_argument("--version", default="v1", help="Zu testende Version: v1, v2 oder v2n (Standard: v1)")
     parser.add_argument("--runs", type=int, default=5, help="Ziel: gültige Läufe pro Szenario (Standard: 5)")
-    parser.add_argument("--only", default="", help="Nur diese Szenarien, z. B. K1,A1,A2b (Groß-/Kleinschreibung egal)")
+    parser.add_argument("--only", default="", help="Nur diese Szenarien, z. B. K1,A1,A2b,A8s (Groß-/Kleinschreibung egal)")
     parser.add_argument("--pause", type=float, default=2.0, help="Zusätzliche Pause zwischen den Versuchen in Sekunden")
     parser.add_argument("--fresh", action="store_true", help="Bisherige Ergebnisse sichern und neu beginnen")
     parser.add_argument("--summary-only", action="store_true", help="Nur die Zusammenfassung neu erstellen (ohne Anfragen)")
