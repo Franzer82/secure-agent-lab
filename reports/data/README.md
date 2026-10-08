@@ -9,3 +9,10 @@ stehen in `SHA256SUMS` (Prüfen mit `shasum -a 256 -c SHA256SUMS`).
   Versuchs mit technischem Fehler (Status `fehler`)
 
 Das verwendete Modell steht in jedem Versuch (Feld `model`).
+
+## Nachtrag A8s
+
+`trials_a8s_v1.jsonl`, `trials_a8s_v2n.jsonl` und `trials_a8s_v2.jsonl` enthalten nur
+die Versuche des Nachtrags A8s (siehe `docs/a8s_plan.md`). Prüfsummen in
+`SHA256SUMS_a8s`. Die Dateien `trials_v1.jsonl` und `trials_v2.jsonl` blieben davon
+unberührt.
