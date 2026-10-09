@@ -1,0 +1,58 @@
+name: Tests
+
+# Alle Prüfungen laufen ohne Modellzugriff: Es wird kein API-Schlüssel gebraucht und keiner übergeben.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Repository auschecken (volle Historie)
+        uses: actions/checkout@v6
+        with:
+          # Die Prüfungen vergleichen mit früheren Commits (Baseline, Messplan).
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Python einrichten
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Abhängigkeiten installieren
+        run: pip install -r requirements.txt
+
+      - name: Prüfsummen der Rohdaten
+        working-directory: reports/data
+        run: |
+          sha256sum -c SHA256SUMS
+          sha256sum -c SHA256SUMS_a8s
+          sha256sum -c SHA256SUMS_k6
+
+      - name: Tests
+        run: python tests/run_all.py
+
+      - name: Baseline und Messplan unverändert
+        run: |
+          python tests/verify_baseline.py
+          python tests/verify_plan.py
+
+      - name: Keine Schlüssel im Repository
+        run: |
+          if git grep -q -E 'AIza[0-9A-Za-z_-]{35}|ghp_[0-9A-Za-z]{36}|github_pat_[0-9A-Za-z_]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----'; then
+            echo "Muster für einen Schlüssel oder ein Token gefunden"
+            exit 1
+          fi
