@@ -121,3 +121,9 @@ reports/      Zusammenfassungen, Rohdaten mit Prüfsummen (reports/data)
 ```
 
 Einstieg in die Dokumentation: `docs/threat_model.md` (Bedrohungsmodell), `docs/v2_plan.md` (Messplan und Ergebnisse von Version 2), `docs/v2_1_plan.md` (Nachbesserung).
+
+## Dokumentation als PDF
+
+- [Sicherheitskonzept](docs/Secure_Agent_Lab_Sicherheitskonzept.pdf): Zielarchitektur, Maßnahmen, Zuordnung zu OWASP und NIST, Restrisiken
+- [Assessment-Bericht](docs/Secure_Agent_Lab_Assessment_Bericht.pdf): Methodik, Messergebnisse, Befunde, Grenzen, Empfehlungen
+- [Betriebsdokumentation](docs/Secure_Agent_Lab_Betriebsdokumentation.pdf): Aufbau, Tests, Messungen wiederholen, Audit-Log, Fehlerbehebung
