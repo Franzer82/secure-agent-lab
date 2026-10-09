@@ -16,3 +16,8 @@ Das verwendete Modell steht in jedem Versuch (Feld `model`).
 die Versuche des Nachtrags A8s (siehe `docs/a8s_plan.md`). Prüfsummen in
 `SHA256SUMS_a8s`. Die Dateien `trials_v1.jsonl` und `trials_v2.jsonl` blieben davon
 unberührt.
+
+## Kontrollfall K6
+
+`trials_k6_v2n.jsonl` und `trials_k6_v2.jsonl` enthalten nur die Versuche des
+Kontrollfalls K6 (siehe `docs/k6_plan.md`). Prüfsummen in `SHA256SUMS_k6`.
