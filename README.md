@@ -72,6 +72,8 @@ Jede Messung hat einen Plan, der **vor** den Ergebnissen committet wurde. Die Co
 | `bd5ea05` | K6: Plan vor der Messung |
 | `c6a49ae` | K6: Ergebnisse |
 | `18218f0` | Version 2.1: Plan vor dem Bau |
+| `5bfa219` | Version 2.1: Server mit Ticket-Limit, allgemeinen Meldungen und Audit-Log, mit Tests |
+| `1cc2de4` | Version 2.1: Policy mit Notizprüfung, Audit-Log, Konfiguration v2.1, Tests |
 | `1ae3e1b` | Version 2.1: Wiedergabe mit Ziel, Tests |
 | `190d0d5` | Version 2.1: Ergebnisse der Wiedergabe |
 
