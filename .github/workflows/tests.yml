@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Repository auschecken (volle Historie)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # Die Prüfungen vergleichen mit früheren Commits (Baseline, Messplan).
           fetch-depth: 0
