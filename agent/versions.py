@@ -13,10 +13,13 @@ from agent_core import (
 )
 from output_filter_v2 import filter_output_v2
 from policy_v2 import make_policy_v2
+from policy_v2_1 import make_policy_v2_1
 from run_v1 import SERVER_PATH as SERVER_PATH_V1
 from run_v1 import SYSTEM_PROMPT_V1
 from run_v2 import SERVER_PATH as SERVER_PATH_V2
 from run_v2 import SYSTEM_PROMPT_V2
+
+SERVER_PATH_V2_1 = Path(__file__).resolve().parent.parent / "mcp_server" / "server_v2_1.py"
 
 
 @dataclass
@@ -83,8 +86,7 @@ def get_version(name: str) -> VersionConfig:
     if name == "v2n":
         # Gegenprobe für A8s (docs/a8s_plan.md): Version 2, aber die Notizen werden
         # wie in Version 1 behandelt (Systemprompt, Formatierer v1). Server, Policy,
-        # Ausgabefilter und Systemprompt sind identisch mit Version 2. Nur der
-        # Vergleich v2n gegen v2 isoliert die Umstellung "Notizen als Daten".
+        # Ausgabefilter und Systemprompt sind identisch mit Version 2.
         return VersionConfig(
             name="v2n",
             server_path=SERVER_PATH_V2,
@@ -92,6 +94,20 @@ def get_version(name: str) -> VersionConfig:
             policy_factory=make_policy_v2,
             memory_formatter=format_memory_v1,
             memory_placement="system",
+            output_filter=filter_output_v2,
+            excluded=dict(EXCLUDED_V2),
+        )
+
+    if name == "v2.1":
+        # Nachbesserung ohne neue Messung (docs/v2_1_plan.md): Server v2.1 und Policy v2.1.
+        # Systemprompt, Notiz-Behandlung und Ausgabefilter sind identisch mit Version 2.
+        return VersionConfig(
+            name="v2.1",
+            server_path=SERVER_PATH_V2_1,
+            system_prompt=SYSTEM_PROMPT_V2,
+            policy_factory=make_policy_v2_1,
+            memory_formatter=format_memory_v2,
+            memory_placement="user",
             output_filter=filter_output_v2,
             excluded=dict(EXCLUDED_V2),
         )
