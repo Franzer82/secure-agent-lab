@@ -1,13 +1,13 @@
 from pathlib import Path
 
-# Setzt den veränderlichen Laborzustand zurück (Gedächtnis, Tickets, E-Mails).
+# Setzt den veränderlichen Laborzustand zurück (Gedächtnis, Tickets, E-Mails, Audit-Log).
 # Es werden bewusst nur ausdrücklich benannte Dateien gelöscht, nie ein ganzer
 # Ordner: Ein Löschwerkzeug soll nur das anfassen können, wofür es gedacht ist.
 
 OUTBOX_DIR = Path(__file__).resolve().parent.parent / "outbox"
 
 MEMORY_FILES = ["memory.jsonl"]
-OUTBOX_FILES = ["tickets.jsonl", "emails.jsonl"]
+OUTBOX_FILES = ["tickets.jsonl", "emails.jsonl", "audit.jsonl"]
 
 
 def _remove(names: list[str]) -> list[str]:

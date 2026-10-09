@@ -17,6 +17,7 @@ FILES = [
     "test_analyze.py",
     "test_a8s.py",
     "test_k6.py",
+    "test_server_v2_1.py",
 ]
 SUMMARY = re.compile(r"(\d+) von (\d+) Prüfungen bestanden")
 
